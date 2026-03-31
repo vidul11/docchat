@@ -1,0 +1,24 @@
+# Environment
+.env
+.venv/
+
+# ChromaDB index (rebuilt via ingestion)
+chroma_db/
+
+# User documents (personal files, not for version control)
+data/documents/
+
+# uv lockfile (optional: commit if you want reproducible installs)
+# uv.lock
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/

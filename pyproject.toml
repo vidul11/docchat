@@ -1,0 +1,30 @@
+[project]
+name = "docchat"
+version = "0.1.0"
+description = "Personal knowledge base with RAG pipeline and MCP server"
+requires-python = ">=3.11"
+dependencies = [
+    "langchain>=0.3",
+    "langchain-community>=0.3",
+    "langchain-chroma>=0.1",
+    "langchain-huggingface>=0.1",
+    "langchain-ollama>=0.2",
+    "langchain-openai>=0.2",
+    "chromadb>=0.5",
+    "sentence-transformers>=3.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "gradio>=5.0",
+    "mcp>=1.0",
+    "pypdf>=4.0",
+    "unstructured[md]>=0.16",
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = []
