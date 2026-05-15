@@ -74,18 +74,53 @@ def build_gradio_ui(chain) -> gr.Blocks:
         except Exception as e:
             return f"Error: {e}"
 
-    with gr.Blocks(title="DocChat") as ui:
-        gr.Markdown("# DocChat\nAsk me anything from what you provided.")
+    css = """
+    body, .gradio-container { background-color: #1e1e1e !important; }
+    .gradio-container { max-width: 100% !important; padding: 24px 40px !important; }
+    #chatbot { background-color: #2a2a2a !important; border: 1px solid #333 !important; border-radius: 12px !important; }
+    #msg_box textarea { background-color: #2a2a2a !important; color: #f0f0f0 !important; border: 1px solid #444 !important; border-radius: 8px !important; }
+    #send_btn { background-color: #00bcd4 !important; color: #000 !important; border-radius: 8px !important; font-weight: 600 !important; }
+    #send_btn:hover { background-color: #00acc1 !important; }
+    #clear_btn { background-color: #2a2a2a !important; color: #00bcd4 !important; border: 1px solid #00bcd4 !important; border-radius: 8px !important; }
+    #clear_btn:hover { background-color: #00bcd4 !important; color: #000 !important; }
+    #upload_row { background-color: #2a2a2a !important; border: 1px solid #333 !important; border-radius: 10px !important; padding: 12px !important; }
+    .message.bot { background-color: #2a2a2a !important; border: 1px solid #333 !important; color: #f0f0f0 !important; }
+    .message.user { background-color: transparent !important; color: #f0f0f0 !important; border: 1px solid #00bcd4 !important; }
+    h1 { color: #f0f0f0 !important; }
+    p { color: #aaa !important; }
+    """
 
-        chatbot = gr.Chatbot(height=450, type="messages")
-        msg_box = gr.Textbox(placeholder="You know what to do...", show_label=False)
-        clear_btn = gr.Button("Clear")
+    with gr.Blocks(title="DocChat", css=css) as ui:
+        gr.Markdown("# DocChat\nAsk questions about your uploaded documents.")
 
-        gr.Markdown("---\n### Add a document")
-        file_upload = gr.File(file_types=[".pdf", ".md", ".txt"], label="Upload document")
-        upload_status = gr.Textbox(label="Upload status", interactive=False)
+        chatbot = gr.Chatbot(height=600, type="messages", elem_id="chatbot", show_label=False)
+
+        with gr.Row():
+            msg_box = gr.Textbox(
+                placeholder="Ask a question...",
+                show_label=False,
+                elem_id="msg_box",
+                scale=7,
+                container=False,
+            )
+            send_btn = gr.Button("Send", elem_id="send_btn", scale=1, min_width=80)
+            clear_btn = gr.Button("Clear", elem_id="clear_btn", scale=1, min_width=80)
+
+        with gr.Column(elem_id="upload_row"):
+            file_upload = gr.File(
+                file_types=[".pdf", ".md", ".txt"],
+                label="Upload a document (PDF, MD, TXT)",
+            )
+            upload_status = gr.Textbox(
+                label=None,
+                placeholder="Upload status will appear here...",
+                interactive=False,
+                show_label=False,
+                container=False,
+            )
 
         msg_box.submit(respond, [msg_box, chatbot], [msg_box, chatbot])
+        send_btn.click(respond, [msg_box, chatbot], [msg_box, chatbot])
         clear_btn.click(lambda: ([], ""), outputs=[chatbot, msg_box])
         file_upload.change(ingest_uploaded_file, [file_upload], [upload_status])
 
