@@ -22,3 +22,6 @@ build/
 # IDE
 .vscode/
 .idea/
+
+# Session logs
+logs.md

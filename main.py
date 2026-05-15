@@ -47,15 +47,21 @@ def build_gradio_ui(chain) -> gr.Blocks:
     """
     def respond(message: str, history: list) -> tuple[str, list]:
         """Called every time the user sends a message."""
-        result = query(chain, message)
-        sources = result["sources"]
+        if not message.strip():
+            return "", history
+        try:
+            result = query(chain, message)
+            sources = result["sources"]
+            if sources:
+                response = result["answer"] + "\n\n**Sources:** " + ", ".join(sources)
+            else:
+                response = result["answer"]
+        except Exception as e:
+            logger.exception("Query failed")
+            response = f"Something went wrong while answering your question. Please try again.\n\n_(Error: {e})_"
 
-        if sources:
-            response = result["answer"] + "\n\n**Sources:** " + ", ".join(sources)
-        else:
-            response = result["answer"]
-
-        history.append((message, response))
+        history.append({"role": "user", "content": message})
+        history.append({"role": "assistant", "content": response})
         return "", history
 
     def ingest_uploaded_file(file) -> str:
@@ -71,7 +77,7 @@ def build_gradio_ui(chain) -> gr.Blocks:
     with gr.Blocks(title="DocChat") as ui:
         gr.Markdown("# DocChat\nAsk me anything from what you provided.")
 
-        chatbot = gr.Chatbot(height=450)
+        chatbot = gr.Chatbot(height=450, type="messages")
         msg_box = gr.Textbox(placeholder="You know what to do...", show_label=False)
         clear_btn = gr.Button("Clear")
 

@@ -7,17 +7,19 @@ Flow for every user question:
   3. Stuff those chunks into a prompt as "context".
   4. Send the prompt to the LLM and return the answer + source docs.
 
-Why "stuff" strategy (not map-reduce or refine)?
-- Simple: all chunks go into one prompt in a single LLM call.
-- Fast: no extra LLM calls to merge partial answers.
-- Fine for our chunk sizes — the total context fits in the model's window.
+Why LCEL (LangChain Expression Language) instead of RetrievalQA?
+RetrievalQA was removed in LangChain 1.x. LCEL uses the | pipe operator to
+chain steps explicitly — easier to read and more flexible.
 """
 
 import logging
+import re
+from pathlib import Path
 
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
 from langchain_core.language_models import BaseLanguageModel
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 
 from app.config import LLM_PROVIDER, OLLAMA_BASE_URL, OLLAMA_MODEL, OPENAI_API_KEY, OPENAI_MODEL, RETRIEVAL_K
 from app.ingestor import get_vectorstore
@@ -46,6 +48,11 @@ Answer (cite the source document when possible):""",
 )
 
 
+def _format_docs(docs) -> str:
+    """Concatenate retrieved chunks into a single context string."""
+    return "\n\n".join(doc.page_content for doc in docs)
+
+
 # ---------------------------------------------------------------------------
 # LLM factory
 # ---------------------------------------------------------------------------
@@ -65,59 +72,63 @@ def _build_llm() -> BaseLanguageModel:
         from langchain_openai import ChatOpenAI
         return ChatOpenAI(model=OPENAI_MODEL, api_key=OPENAI_API_KEY, temperature=0.1)
 
-    from langchain_ollama import OllamaLLM
-    return OllamaLLM(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL, temperature=0.1)
+    from langchain_ollama import ChatOllama
+    return ChatOllama(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL, temperature=0.1, reasoning=False)
+
 
 # ---------------------------------------------------------------------------
 # Chain builder
 # ---------------------------------------------------------------------------
 
-def build_rag_chain() -> RetrievalQA:
+def build_rag_chain() -> dict:
     """
-    Assemble and return a RetrievalQA chain ready to answer questions.
+    Assemble and return a RAG chain using LCEL (pipe syntax).
 
-    Call this once at startup and reuse the chain — building it is expensive
+    Returns a dict with:
+      "chain"     — the runnable that produces the answer string
+      "retriever" — kept separately so query() can get source documents
+
+    Call this once at startup and reuse — building it is expensive
     (opens ChromaDB, loads embedding model) but invoking it is cheap.
     """
     llm = _build_llm()
     vectorstore = get_vectorstore()
-
     retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVAL_K})
 
-    return RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=retriever,
-        chain_type_kwargs={"prompt": _PROMPT},
-        return_source_documents=True,
+    # LCEL pipe: retrieve → format → prompt → LLM → parse to string
+    chain = (
+        {"context": retriever | _format_docs, "question": RunnablePassthrough()}
+        | _PROMPT
+        | llm
+        | StrOutputParser()
     )
+
+    return {"chain": chain, "retriever": retriever}
 
 
 # ---------------------------------------------------------------------------
 # Query helper
 # ---------------------------------------------------------------------------
 
-def query(chain: RetrievalQA, question: str) -> dict:
+def _strip_think(text: str) -> str:
+    """Remove <think>...</think> blocks that qwen3 adds when thinking mode leaks through."""
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+
+def query(rag: dict, question: str) -> dict:
     """
-    Run a question through the chain and return a clean result dict.
+    Run a question through the RAG chain and return a clean result dict.
 
     Returns:
         {
             "answer":  str,
             "sources": list[str]   # unique source filenames
         }
-
-    Why a wrapper instead of calling chain.invoke() directly?
-    The raw chain result has LangChain internals ("source_documents", "result").
-    This function gives callers a stable, simple interface — the API and UI
-    don't need to know about LangChain's internal structure.
     """
-    result = chain.invoke({"query": question})
-    answer = result["result"]
-    sources = {
-        doc.metadata.get("source", "unknown")
-        for doc in result["source_documents"]
-    }
-    sources = sorted(sources)
+    answer = _strip_think(rag["chain"].invoke(question))
+
+    # Fetch sources separately using the same retriever
+    docs = rag["retriever"].invoke(question)
+    sources = sorted({Path(doc.metadata.get("source", "unknown")).name for doc in docs})
 
     return {"answer": answer, "sources": sources}
