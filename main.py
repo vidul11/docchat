@@ -1,22 +1,7 @@
-"""
-Entry point — wires FastAPI, Gradio UI, and the MCP server together.
-
-Why one entry point instead of running them separately?
-- Single command to start the whole system: `uv run python main.py`
-- Gradio mounts into FastAPI so both share the same port (8000)
-- MCP server also mounts into FastAPI at /mcp
-- One process, one port, everything works together
-
-Port layout (all on localhost:8000):
-  /          → Gradio chat UI
-  /query     → FastAPI REST endpoint
-  /ingest    → FastAPI REST endpoint
-  /sources   → FastAPI REST endpoint
-  /docs      → FastAPI auto-generated API docs (free, always available)
-  /mcp/sse   → MCP SSE connection endpoint
-"""
+"""Entry point — wires FastAPI, Gradio UI, and the MCP server together on port 8000."""
 
 import logging
+from pathlib import Path
 
 import gradio as gr
 import uvicorn
@@ -30,23 +15,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Gradio UI
-# ---------------------------------------------------------------------------
-
 def build_gradio_ui(chain) -> gr.Blocks:
-    """
-    Build the Gradio chat interface.
-
-    gr.Blocks lets us compose multiple components (chatbot, file upload,
-    sources display) into one page — more flexible than gr.ChatInterface.
-
-    Why pass `chain` as an argument instead of importing it?
-    The chain is already built by the time this function is called.
-    Passing it in makes the dependency explicit and avoids circular imports.
-    """
+    """Build the Gradio chat interface."""
     def respond(message: str, history: list) -> tuple[str, list]:
-        """Called every time the user sends a message."""
         if not message.strip():
             return "", history
         try:
@@ -65,12 +36,11 @@ def build_gradio_ui(chain) -> gr.Blocks:
         return "", history
 
     def ingest_uploaded_file(file) -> str:
-        """Called when the user uploads a document via the UI."""
         if file is None:
             return "No file uploaded."
         try:
             n = ingest_file(file.name)
-            return f"Ingested {file.name} — {n} chunks added."
+            return f"Ingested {Path(file.name).name} — {n} chunks added."
         except Exception as e:
             return f"Error: {e}"
 
@@ -127,15 +97,9 @@ def build_gradio_ui(chain) -> gr.Blocks:
     return ui
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
 def main():
     logger.info("Starting DocChat...")
 
-    # Build the RAG chain once — shared by both the API and the Gradio UI.
-    # (The MCP server builds its own copy lazily on first request.)
     chain = build_rag_chain()
 
     app.mount("/mcp", create_mcp_app())

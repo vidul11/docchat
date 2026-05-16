@@ -8,9 +8,6 @@ chroma_db/
 # User documents (personal files, not for version control)
 data/documents/
 
-# uv lockfile (optional: commit if you want reproducible installs)
-# uv.lock
-
 # Python
 __pycache__/
 *.pyc
@@ -25,3 +22,6 @@ build/
 
 # Session logs
 logs.md
+
+# Planning docs (superseded by README)
+docchat_plan.md

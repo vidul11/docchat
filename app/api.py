@@ -1,16 +1,4 @@
-"""
-FastAPI backend — three endpoints that expose the RAG pipeline over HTTP.
-
-Why FastAPI?
-- Automatic request/response validation via Pydantic models.
-- Auto-generated docs at /docs (useful for testing without a UI).
-- Async-native, so file uploads and LLM calls don't block each other.
-
-Endpoint summary:
-  POST /query   — ask a question, get a grounded answer + sources
-  POST /ingest  — upload a new document into the knowledge base
-  GET  /sources — list all documents currently in ChromaDB
-"""
+"""FastAPI backend — /query, /ingest, /sources endpoints over the RAG pipeline."""
 
 import logging
 import shutil
@@ -25,16 +13,8 @@ from app.rag import build_rag_chain, query
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# App + startup
-# ---------------------------------------------------------------------------
-
 app = FastAPI(title="DocChat", description="RAG over your personal documents")
 
-# The chain is built once at startup and reused for every request.
-# Why not build it inside each request handler?
-# Loading ChromaDB + the embedding model takes ~2-3 seconds.
-# You'd pay that cost on every single query — unacceptable for a chat app.
 _chain = None
 
 
@@ -46,30 +26,14 @@ async def startup():
     logger.info("RAG chain ready.")
 
 
-# ---------------------------------------------------------------------------
-# Request / Response models
-# ---------------------------------------------------------------------------
-
-# Pydantic models define the shape of JSON that comes in and goes out.
-# FastAPI validates them automatically — if the client sends the wrong type,
-# it returns a 422 error before your code even runs.
-
 class QueryRequest(BaseModel):
     question: str
-
-
-class SourceSnippet(BaseModel):
-    source: str
 
 
 class QueryResponse(BaseModel):
     answer: str
     sources: list[str]
 
-
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
 
 @app.post("/query", response_model=QueryResponse)
 async def query_endpoint(request: QueryRequest):
@@ -82,14 +46,7 @@ async def query_endpoint(request: QueryRequest):
 
 @app.post("/ingest")
 async def ingest_endpoint(file: UploadFile):
-    """
-    Upload a document (PDF, MD, TXT) and add it to the knowledge base.
-
-    Why save to a temp file first?
-    LangChain's loaders (PyPDFLoader etc.) need a real file path on disk —
-    they can't read from an in-memory stream. So we write the upload to a
-    temp file, ingest it, then delete it.
-    """
+    """Upload a document (PDF, MD, TXT) and add it to the knowledge base."""
     suffix = Path(file.filename).suffix.lower()
     if suffix not in {".pdf", ".md", ".txt"}:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {suffix}")
