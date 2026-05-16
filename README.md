@@ -10,7 +10,8 @@ This project was built to get hands-on with the tools that power most modern AI 
 
 You upload a document. DocChat breaks it into chunks, embeds them locally, and stores them in ChromaDB. When you ask a question, it finds the most relevant chunks and sends them to a local LLM to generate an answer — no hallucinations, no outside knowledge leaking in.
 
-# tested with "Attention Is All You Need" (Vaswani et al., 2017)
+**Tested with "Attention Is All You Need" (Vaswani et al., 2017)**
+
 You: What is the main contribution of this paper?
 
 DocChat: The Transformer is the first transduction model relying entirely on
