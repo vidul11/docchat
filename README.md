@@ -12,12 +12,14 @@ You upload a document. DocChat breaks it into chunks, embeds them locally, and s
 
 **Tested with "Attention Is All You Need" (Vaswani et al., 2017)**
 
-You: What is the main contribution of this paper?
+```
+You:     What is the main contribution of this paper?
 
 DocChat: The Transformer is the first transduction model relying entirely on
          self-attention without using RNNs or convolution.
 
-         Sources: attention_is_all_you_need.pdf
+Sources: attention_is_all_you_need.pdf
+```
 
 ---
 
